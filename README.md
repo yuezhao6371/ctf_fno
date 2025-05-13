@@ -2,12 +2,53 @@
 
 This directory contains an implementation of the Fourier Neural Operator (FNO) model for the CTF for Science Framework. The FNO is a deep learning architecture designed for learning operators between function spaces, particularly effective for solving partial differential equations.
 
+## Setup
+
+1. Create and activate a virtual environment (recommended):
+```bash
+python -m venv venv
+source venv/bin/activate
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+To run the model, use the `run.py` script from the model directory:
+
+```bash
+cd models/ctf_fno
+python run.py config/config_Lorenz.yaml
+python run.py config/config_KS.yaml
+```
+
+### Hyperparameter Tuning
+
+To run hyperparameter tuning:
+
+```bash
+cd models/ctf_fno
+python optimize_parameters.py --metric 'score' --mode 'max'
+```
+
+## Configuration Files
+
+Configuration files are located in the `config/` directory:
+- `config_KS.yaml`: Runs the FNO model on `PDE_KS` for all sub-datasets
+- `config_Lorenz.yaml`: Runs the FNO model on `ODE_Lorenz` for all sub-datasets
+
 ## Dependencies
 
 The FNO implementation requires the following dependencies:
 - PyTorch (>= 1.8.0)
-- NumPy
-- CUDA (optional, for GPU acceleration)
+- NumPy (>= 1.19.0)
+- PyYAML (>= 5.1.0)
+- Ray [tune] (>= 2.0.0) for hyperparameter tuning
+
+See `requirements.txt` for the complete list of dependencies.
 
 ## Model Architecture
 
@@ -20,37 +61,6 @@ Key components:
 - `SpectralConv2d`: Implements the Fourier layer with learnable weights in the frequency domain
 - `FNO2d`: Main model architecture combining multiple spectral and pointwise convolutions
 - `FNO`: High-level wrapper class that handles data preparation, training, and prediction
-
-## Usage
-
-1. Configure your run by editing the YAML configuration file in `config/`:
-   ```yaml
-   dataset:
-     name: ODE_Lorenz
-     pair_id: '1-6'
-   model:
-     modes1: 12
-     modes2: 12
-     width: 20
-     # ... other parameters
-   ```
-
-2. Run the model:
-   ```bash
-   python run.py config/config_Lorenz.yaml
-   ```
-
-## Configuration Parameters
-
-- `modes1`, `modes2`: Number of Fourier modes to use in each dimension
-- `width`: Width of the network (number of channels)
-- `in_channels`: Number of input channels
-- `out_channels`: Number of output channels
-- `learning_rate`: Learning rate for training
-- `epochs`: Number of training epochs
-- `scheduler`: Learning rate scheduler parameters
-  - `step_size`: Step size for learning rate decay
-  - `gamma`: Multiplicative factor for learning rate decay
 
 ## Output
 
