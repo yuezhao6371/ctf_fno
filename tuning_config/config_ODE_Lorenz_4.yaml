@@ -1,0 +1,42 @@
+dataset:
+  name: ODE_Lorenz
+  pair_id:
+  - 4
+hyperparameters:
+  batch_size:
+    choices:
+    - 16
+    - 32
+    - 64
+    - 128
+    type: choice
+  learning_rate:
+    lower_bound: 0.0001
+    type: loguniform
+    upper_bound: 0.01
+  modes1:
+    lower_bound: 8
+    type: randint
+    upper_bound: 32
+  modes2:
+    lower_bound: 8
+    type: randint
+    upper_bound: 32
+  width:
+    lower_bound: 32
+    type: randint
+    upper_bound: 128
+model:
+  batch_size: 20
+  epochs: 500
+  in_channels: 1
+  learning_rate: 0.001
+  modes1: 16
+  modes2: 16
+  n_trials: 20
+  name: FNO
+  out_channels: 1
+  scheduler_gamma: 0.5
+  scheduler_step: 100
+  train_ratio: 0.8
+  width: 64
