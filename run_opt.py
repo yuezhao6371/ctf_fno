@@ -50,6 +50,10 @@ def main(config_path: str) -> None:
             train_split = config['model']['train_ratio']
             train_data, val_data, init_data = load_validation_dataset(dataset_name, pair_id, train_split, transpose=False)
             
+            # Concatenate training data arrays along axis 0 (time dimension)
+            if isinstance(train_data, list):
+                train_data = np.concatenate(train_data, axis=0)
+            
             # Load meta-data
             prediction_timesteps = get_validation_prediction_timesteps(dataset_name, pair_id, train_split)
 
@@ -88,11 +92,10 @@ def main(config_path: str) -> None:
             continue
 
     # Save results
-    import json
-    results_path = file_dir / 'results' / f'{batch_id}.json'
+    results_path = file_dir / f"results_{config['model']['batch_id']}.yaml"
     results_path.parent.mkdir(exist_ok=True)
     with open(results_path, 'w') as f:
-        json.dump(batch_results, f, indent=2)
+        yaml.dump(batch_results, f, default_flow_style=False)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
