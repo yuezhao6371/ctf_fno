@@ -4,7 +4,7 @@ This directory contains an implementation of the Fourier Neural Operator (FNO) m
 
 ## Setup
 
-1. Create and activate a virtual environment (recommended):
+1. Create and activate a virtual environment:
 ```bash
 python -m venv venv
 source venv/bin/activate
