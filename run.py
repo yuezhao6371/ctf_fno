@@ -4,11 +4,16 @@ from pathlib import Path
 import datetime
 import numpy as np
 import logging
+import torch
+import os
 from ctf4science.data_module import load_dataset, parse_pair_ids, get_applicable_plots, get_prediction_timesteps, get_training_timesteps
 from ctf4science.eval_module import evaluate, save_results
 from ctf4science.visualization_module import Visualization
 from fno import FNO
 
+# Set PyTorch memory configuration
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+torch.cuda.empty_cache()
 
 def setup_logging(log_level=logging.INFO):
     """Set up logging configuration."""
@@ -79,16 +84,18 @@ def main(config_path: str, log_level=logging.INFO):
                 logger.debug(f"Training data list length: {len(train_data)}")
                 for i, data in enumerate(train_data):
                     logger.debug(f"Training data[{i}] shape: {data.shape if hasattr(data, 'shape') else None}")
+                # Handle pairs 8 and 9 differently
+                if pair_id in [8, 9]:
+                    # For pairs 8 and 9, concatenate along axis 0 (time dimension)
+                    train_data = np.concatenate(train_data, axis=0)
+                else:
+                    # For other pairs, concatenate along axis 1 (columns)
+                    train_data = np.concatenate(train_data, axis=1)
+                logger.debug(f"Concatenated training data shape: {train_data.shape}")
             else:
                 logger.debug(f"Training data shape: {train_data.shape if train_data is not None else None}")
             logger.debug(f"Initialization data shape: {init_data.shape if init_data is not None else None}")
 
-            # Load initialization matrix if it exists
-            if init_data is None:
-                # Stack all training matrices to get a single training matrix
-                train_data = np.concatenate(train_data, axis=1)
-                logger.debug(f"Concatenated training data shape: {train_data.shape}")
-            
             # Load metadata (to provide forecast length)
             prediction_timesteps = get_prediction_timesteps(dataset_name, pair_id)
             prediction_horizon_steps = prediction_timesteps.shape[0]
@@ -109,7 +116,13 @@ def main(config_path: str, log_level=logging.INFO):
             # Evaluate predictions using default metrics
             logger.info(f"Evaluating predictions for pair {pair_id}")
             results = evaluate(dataset_name, pair_id, pred_data)
-            logger.info(f"Evaluation results: {results}")
+            
+            # Print evaluation results in a clear format
+            logger.info(f"\nEvaluation Results for Pair {pair_id}:")
+            logger.info("=" * 50)
+            for metric_name, metric_value in results.items():
+                logger.info(f"{metric_name}: {metric_value:.6f}")
+            logger.info("=" * 50 + "\n")
 
             # Save results for this sub-dataset and get the path to the results directory
             results_directory = save_results(dataset_name, model_name, batch_id, pair_id, config, pred_data, results)
@@ -130,6 +143,17 @@ def main(config_path: str, log_level=logging.INFO):
         except Exception as e:
             logger.error(f"Error processing pair {pair_id}: {str(e)}", exc_info=True)
             continue
+
+    # Print final summary of all pairs
+    logger.info("\nFinal Summary of All Pairs:")
+    logger.info("=" * 50)
+    for pair_result in batch_results['pairs']:
+        pair_id = pair_result['pair_id']
+        metrics = pair_result['metrics']
+        logger.info(f"\nPair {pair_id}:")
+        for metric_name, metric_value in metrics.items():
+            logger.info(f"  {metric_name}: {metric_value:.6f}")
+    logger.info("=" * 50)
 
     # Save aggregated batch results
     batch_results_path = results_directory.parent / 'batch_results.yaml'

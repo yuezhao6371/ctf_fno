@@ -1,5 +1,5 @@
 dataset:
-  name: ODE_Lorenz
+  name: PDE_KS
   pair_id:
   - 4
 hyperparameters:
@@ -33,7 +33,7 @@ model:
   learning_rate: 0.001
   modes1: 16
   modes2: 16
-  n_trials: 20
+  n_trials: 200
   name: FNO
   out_channels: 1
   scheduler_gamma: 0.5

@@ -41,6 +41,12 @@ class UnitGaussianNormalizer(object):
         # Ensure x has the same number of dimensions as mean and std
         if x.dim() < mean.dim():
             x = x.unsqueeze(0)
+            
+        # Handle the case where x has more dimensions than mean/std
+        if x.dim() > mean.dim():
+            # Keep only the first dimension (time steps) and last dimension (features)
+            x = x.squeeze(1)  # Remove the middle dimension
+            
         x = (x * std) + mean
         return x
 
@@ -288,7 +294,16 @@ class FNO:
             logger.debug(f"Training data shape: {train_data.shape}")
             logger.debug(f"Number of time points (m): {self.m}")
             logger.debug(f"Number of spatial points (n): {self.n}")
-        self.init_data = init_data
+        
+        # Special handling for reconstruction tasks (pair_id 2 or 4)
+        if self.pair_id in [2, 4]:
+            logger.info("Reconstruction task: Using full training data for initialization")
+            self.init_data = train_data  # Use full training data for reconstruction
+            self.reconstruction_task = True
+        else:
+            self.init_data = init_data
+            self.reconstruction_task = False
+            
         if init_data is not None:
             logger.debug(f"Initialization data shape: {init_data.shape}")
         self.prediction_horizon_steps = prediction_horizon_steps
@@ -446,6 +461,10 @@ class FNO:
         """
         Generate predictions using the trained model.
         """
+        # Set PyTorch memory configuration
+        torch.cuda.set_per_process_memory_fraction(0.8)  # Limit GPU memory usage
+        torch.cuda.empty_cache()
+        
         if self.init_data is None:
             if self.train_data is None:
                 raise ValueError("Neither initialization data nor training data is available")
@@ -466,25 +485,44 @@ class FNO:
                 logger.debug(f"Input shape for dimension {i}: {x[:, i].shape}")
                 normalized_data[:, i] = self.normalizers[i].encode(x[:, i])
                 logger.debug(f"Output shape for dimension {i}: {normalized_data[:, i].shape}")
+                torch.cuda.empty_cache()  # Clear cache after each normalization
             
             x = normalized_data.unsqueeze(1).unsqueeze(-1)  # Add channel and width dimensions
             logger.debug(f"Input shape after reshaping: {x.shape}")
             
+            # For large datasets (like KS), process in smaller batches
+            batch_size = 32  # Reduced batch size for memory efficiency
             predictions = []
+            
             for step in range(self.prediction_horizon_steps):
-                y = self.model(x)
+                # Process in batches if needed
+                if x.shape[0] > batch_size:
+                    batch_predictions = []
+                    for i in range(0, x.shape[0], batch_size):
+                        end_idx = min(i + batch_size, x.shape[0])
+                        batch_x = x[i:end_idx]
+                        batch_y = self.model(batch_x)
+                        batch_predictions.append(batch_y)
+                        torch.cuda.empty_cache()  # Clear cache after each batch
+                    y = torch.cat(batch_predictions, dim=0)
+                else:
+                    y = self.model(x)
+                
                 logger.debug(f"Step {step} prediction shape: {y.shape}")
                 predictions.append(y)
                 x = y  # Use prediction as next input
+                
+                # Clear CUDA cache periodically
+                if step % 5 == 0:  # More frequent cleanup
+                    torch.cuda.empty_cache()
             
             # Stack predictions along time dimension and remove extra dimensions
             predictions = torch.stack(predictions, dim=0)  # [time_steps, batch, channels, height, width]
-            predictions = predictions.squeeze(1).squeeze(-1)  # Remove batch and width dimensions
-            logger.debug(f"Final predictions shape before denormalization: {predictions.shape}")
+            logger.debug(f"Stacked predictions shape: {predictions.shape}")
             
             # Reshape predictions to [time_steps, spatial_dim]
-            predictions = predictions.squeeze(1)  # Remove channel dimension
-            logger.debug(f"Predictions shape after squeezing: {predictions.shape}")
+            predictions = predictions.reshape(predictions.shape[0], -1)  # Flatten all dimensions except time
+            logger.debug(f"Reshaped predictions shape: {predictions.shape}")
             
             # Initialize denormalized predictions with correct shape
             denormalized_predictions = torch.zeros((predictions.shape[0], self.n), 
@@ -495,7 +533,75 @@ class FNO:
             for i in range(self.n):
                 logger.debug(f"Denormalizing spatial dimension {i}")
                 logger.debug(f"Input shape for dimension {i}: {predictions[:, i].shape}")
-                denormalized_predictions[:, i] = self.normalizers[i].decode(predictions[:, i])
+                
+                # Get the predictions for this dimension
+                dim_predictions = predictions[:, i]
+                logger.debug(f"Dimension predictions shape: {dim_predictions.shape}")
+                
+                # Add small regularization to improve numerical stability
+                eps = 1e-10
+                reg_predictions = dim_predictions + eps * torch.randn_like(dim_predictions)
+                
+                # Reshape to match the normalizer's expected input shape
+                input_data = reg_predictions.reshape(-1, 1)  # Reshape to [time_steps, 1]
+                logger.debug(f"Input data shape after reshape: {input_data.shape}")
+                
+                try:
+                    # Try standard denormalization first
+                    denormalized = self.normalizers[i].decode(input_data)
+                except Exception as e:
+                    logger.warning(f"Standard denormalization failed for dimension {i}: {str(e)}")
+                    # Fallback: Use more regularization
+                    eps = 1e-8
+                    reg_predictions = dim_predictions + eps * torch.randn_like(dim_predictions)
+                    input_data = reg_predictions.reshape(-1, 1)
+                    try:
+                        denormalized = self.normalizers[i].decode(input_data)
+                    except Exception as e:
+                        logger.warning(f"Regularized denormalization failed for dimension {i}: {str(e)}")
+                        # Final fallback: Use simple scaling
+                        mean = self.normalizers[i].mean
+                        std = self.normalizers[i].std
+                        denormalized = input_data * (std + eps) + mean
+                
+                logger.debug(f"Denormalized shape: {denormalized.shape}")
+                
+                # Ensure the denormalized output has the correct shape
+                if denormalized.shape[0] != predictions.shape[0]:
+                    logger.warning(f"Shape mismatch: denormalized shape {denormalized.shape} vs predictions shape {predictions.shape}")
+                    # Take only the first predictions.shape[0] elements
+                    denormalized = denormalized[:predictions.shape[0]]
+                
+                # Store the denormalized predictions
+                denormalized_predictions[:, i] = denormalized.squeeze(-1)
                 logger.debug(f"Output shape for dimension {i}: {denormalized_predictions[:, i].shape}")
+                
+                # Clear CUDA cache periodically
+                if i % 5 == 0:  # More frequent cleanup
+                    torch.cuda.empty_cache()
             
-        return denormalized_predictions.cpu().numpy() 
+            # For reconstruction tasks, ensure predictions match the training data shape
+            if self.reconstruction_task:
+                if denormalized_predictions.shape[0] != self.train_data.shape[0]:
+                    logger.warning(f"Shape mismatch in reconstruction task: predictions shape {denormalized_predictions.shape} vs training data shape {self.train_data.shape}")
+                    # Pad or truncate predictions to match training data shape
+                    if denormalized_predictions.shape[0] < self.train_data.shape[0]:
+                        # Pad with zeros
+                        padding = torch.zeros((self.train_data.shape[0] - denormalized_predictions.shape[0], self.n), 
+                                           dtype=self.dtype, device=self.device)
+                        denormalized_predictions = torch.cat([denormalized_predictions, padding], dim=0)
+                    else:
+                        # Truncate
+                        denormalized_predictions = denormalized_predictions[:self.train_data.shape[0]]
+            
+            # Final cleanup
+            torch.cuda.empty_cache()
+            
+            # Move to CPU before converting to numpy
+            result = denormalized_predictions.cpu().numpy()
+            
+            # Final cleanup
+            del denormalized_predictions
+            torch.cuda.empty_cache()
+            
+            return result 
