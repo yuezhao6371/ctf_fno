@@ -7,12 +7,12 @@ from ctf4science.data_module import load_validation_dataset, get_validation_pred
 from ctf4science.eval_module import evaluate_custom
 from fno import FNO
 
-# Delete results directory - used for storing batch_results
+# Get the directory where this script is located - used for saving results
 file_dir = Path(__file__).parent
 
 def main(config_path: str) -> None:
     """
-    Main function to run the FNO model on specified sub-datasets for hyperparameter optimization.
+    Function to run the FNO model on specified sub-datasets for hyperparameter optimization.
 
     Loads configuration, parses pair_ids, initializes the model, generates predictions,
     evaluates them, and saves results for each sub-dataset under a batch identifier.
