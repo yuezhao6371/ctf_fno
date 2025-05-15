@@ -1,12 +1,32 @@
+"""
+Main script for running the FNO model on specified datasets.
+
+This script handles:
+- Loading the configuration file
+- Processing one or multiple sub-datasets
+- Training the FNO model
+- Generating predictions
+- Evaluating results
+- Saving outputs and visualizations
+"""
+
 import argparse
-import yaml
-from pathlib import Path
 import datetime
-import numpy as np
 import logging
-import torch
 import os
-from ctf4science.data_module import load_dataset, parse_pair_ids, get_applicable_plots, get_prediction_timesteps, get_training_timesteps
+from pathlib import Path
+
+import numpy as np
+import torch
+import yaml
+
+from ctf4science.data_module import (
+    load_dataset,
+    parse_pair_ids,
+    get_applicable_plots,
+    get_prediction_timesteps,
+    get_training_timesteps
+)
 from ctf4science.eval_module import evaluate, save_results
 from ctf4science.visualization_module import Visualization
 from fno import FNO
@@ -84,7 +104,7 @@ def main(config_path: str, log_level=logging.INFO):
                 logger.debug(f"Training data list length: {len(train_data)}")
                 for i, data in enumerate(train_data):
                     logger.debug(f"Training data[{i}] shape: {data.shape if hasattr(data, 'shape') else None}")
-                # Handle pairs 8 and 9 differently
+                # Handle pairs 8 and 9
                 if pair_id in [8, 9]:
                     # For pairs 8 and 9, concatenate along axis 0 (time dimension)
                     train_data = np.concatenate(train_data, axis=0)
@@ -117,7 +137,7 @@ def main(config_path: str, log_level=logging.INFO):
             logger.info(f"Evaluating predictions for pair {pair_id}")
             results = evaluate(dataset_name, pair_id, pred_data)
             
-            # Print evaluation results in a clear format
+            # Print evaluation results
             logger.info(f"\nEvaluation Results for Pair {pair_id}:")
             logger.info("=" * 50)
             for metric_name, metric_value in results.items():
