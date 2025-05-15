@@ -1,4 +1,8 @@
+# Python version used: 3.12.3
 # Core dependencies
-torch>=1.8.0
-numpy>=1.19.0
-pyyaml>=5.1.0
+torch>=1.8.0,<2.0.0
+numpy>=1.19.0,<2.0.0
+pyyaml>=5.1.0,<6.0.0
+
+# Project dependencies which contains ray[tune] and other optional packages
+ctf4science 
