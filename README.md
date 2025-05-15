@@ -1,6 +1,14 @@
 # Fourier Neural Operator (FNO)
 
-This directory contains an implementation of the Fourier Neural Operator (FNO) model for the CTF for Science Framework. The FNO is a deep learning architecture designed for learning operators between function spaces, particularly effective for solving partial differential equations.
+This directory contains an implementation of the Fourier Neural Operator (FNO) model for the CTF for Science Framework. The FNO is a deep learning architecture designed for learning operators between function spaces.
+
+## Table of Contents
+- [Setup](#setup)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Model Architecture](#model-architecture)
+- [Output](#output)
+- [References](#references)
 
 ## Setup
 
@@ -12,17 +20,22 @@ source venv/bin/activate
 
 2. Install dependencies:
 ```bash
+pip install -U pip
 pip install -r requirements.txt
+cd ../..
+pip install -e .[all]
 ```
 
 ## Usage
+
+### Running the Model
 
 To run the model, use the `run.py` script from the model directory:
 
 ```bash
 cd models/ctf_fno
-python run.py config/config_Lorenz.yaml
-python run.py config/config_KS.yaml
+python run.py config/config_Lorenz_batch.yaml
+python run.py config/config_KS_batch.yaml
 ```
 
 ### Hyperparameter Tuning
@@ -34,19 +47,31 @@ cd models/ctf_fno
 python optimize_parameters.py --metric 'score' --mode 'max'
 ```
 
-## Configuration Files
+Additional tuning options:
+- `--time-budget-hours`: Maximum time budget for tuning (default: 24.0)
+- `--use-asha`: Enable ASHA scheduler for early stopping
+- `--gpus-per-trial`: Number of GPUs per trial (default: 0, meaning use all available)
+- `--config-path`: Specify a config path to tune with only that config file (default: all config_*.yaml under tuning_config)
+- use n_trials parameter in the config file to limit the number of trials
+
+## Configuration
 
 Configuration files are located in the `config/` directory:
-- `config_KS.yaml`: Runs the FNO model on `PDE_KS` for all sub-datasets
-- `config_Lorenz.yaml`: Runs the FNO model on `ODE_Lorenz` for all sub-datasets
+- `config_KS_batch.yaml`: Runs the FNO model on `PDE_KS`
+- `config_Lorenz_batch.yaml`: Runs the FNO model on `ODE_Lorenz`
+
+Each configuration file contains:
+- Dataset specifications
+- Model hyperparameters
+- Training parameters
 
 ## Dependencies
 
 The FNO implementation requires the following dependencies:
-- PyTorch (>= 1.8.0)
-- NumPy (>= 1.19.0)
-- PyYAML (>= 5.1.0)
-- Ray [tune] (>= 2.0.0) for hyperparameter tuning
+- PyTorch (>= 1.8.0, < 2.0.0)
+- NumPy (>= 1.19.0, < 2.0.0)
+- PyYAML (>= 5.1.0, < 6.0.0)
+- ctf4science python project
 
 See `requirements.txt` for the complete list of dependencies.
 
@@ -62,15 +87,28 @@ Key components:
 - `FNO2d`: Main model architecture combining multiple spectral and pointwise convolutions
 - `FNO`: High-level wrapper class that handles data preparation, training, and prediction
 
+### Architecture Details
+- Input: Time series data with spatial dimensions
+- Fourier Transform: Converts input to frequency domain
+- Spectral Convolution: Learns frequency domain features
+- Inverse Fourier Transform: Converts back to spatial domain
+- Output: Predicted time series
+
 ## Output
 
-The model generates:
+The model generates several types of outputs:
+
+### Training Outputs from run.py
 - Predictions for each sub-dataset
 - Evaluation metrics (saved in YAML format)
-- Visualization plots for trajectories, histograms, and other metrics
 - Batch results summary
+- Location: `results/` directory under a unique batch identifier
 
-All outputs are saved in the `results/` directory under a unique batch identifier.
+### Tuning Outputs from optimize_parameters.py
+- Optimal hyperparameters
+- Tuning history
+- Performance metrics
+- Location: `results/tune_result` directory
 
 ## References
 
