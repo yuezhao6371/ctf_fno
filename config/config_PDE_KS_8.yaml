@@ -1,0 +1,26 @@
+dataset:
+  name: PDE_KS
+  pair_id: 8
+model:
+  name: FNO
+  # FNO-specific parameters
+  modes1: 24
+  modes2: 31
+  width: 71
+  in_channels: 1
+  out_channels: 1
+  
+  # Training parameters
+  optimizer: "adam"
+  learning_rate: 0.0006597390117250479
+  epochs: 500
+  batch_size: 64
+  activation: "gelu"
+  
+  # Learning rate scheduler
+  scheduler:
+    name: "StepLR"
+    step_size: 100
+    gamma: 0.5
+  
+  train_ratio: 0.8

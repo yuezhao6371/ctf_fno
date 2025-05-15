@@ -1,0 +1,20 @@
+dataset:
+  name: ODE_Lorenz
+  pair_id: 4
+model:
+  name: FNO
+  modes1: 15
+  modes2: 22
+  width: 92
+  in_channels: 1
+  out_channels: 1
+  optimizer: "adam"
+  learning_rate: 0.009172543036510626
+  epochs: 500
+  batch_size: 32
+  scheduler:
+    name: "StepLR"
+    step_size: 100
+    gamma: 0.5
+  
+  train_ratio: 0.8
