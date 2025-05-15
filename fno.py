@@ -237,11 +237,11 @@ class FNO:
     """
     Fourier Neural Operator (FNO) model wrapper.
     
-    This class provides a high-level interface for training and using the FNO model,
+    This class provides an interface for training and using the FNO model,
     handling data preparation, model initialization, training, and prediction.
     
     Attributes:
-        pair_id (int): Identifier for the data pair to consider
+        pair_id (int): ID for the data pair to consider
         train_data (np.ndarray): Training data
         m (int): Number of time points
         n (int): Number of spatial points
@@ -491,7 +491,7 @@ class FNO:
             logger.debug(f"Input shape after reshaping: {x.shape}")
             
             # For large datasets (like KS), process in smaller batches
-            batch_size = 32  # Reduced batch size for memory efficiency
+            batch_size = 32  # Reduce batch size for memory efficiency
             predictions = []
             
             for step in range(self.prediction_horizon_steps):
